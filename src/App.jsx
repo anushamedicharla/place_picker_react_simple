@@ -1,15 +1,30 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import Places from './components/Places.jsx';
 import { AVAILABLE_PLACES } from './data.js';
 import Modal from './components/Modal.jsx';
 import DeleteConfirmation from './components/DeleteConfirmation.jsx';
 import logoImg from './assets/logo.png';
+import { sortPlacesByDistance } from './loc.js';
 
 function App() {
   const modal = useRef();
   const selectedPlace = useRef();
   const [pickedPlaces, setPickedPlaces] = useState([]);
+  const [availablePlaces, setAvailablePlaces] =  useState([]);
+
+  useEffect(() => {
+
+    const localSelectedPlaceIds =  JSON.parse(localStorage.getItem('selectedPlaces')) || [];
+    const storedPlaces = localSelectedPlaceIds.map((id) => AVAILABLE_PLACES.find((place) => place.id === id))
+    setPickedPlaces(storedPlaces);
+
+    //Get current user's location
+    navigator.geolocation.getCurrentPosition((position) => {
+      const sortedPlaces = sortPlacesByDistance(AVAILABLE_PLACES, position.coords.latitude, position.coords.longitude);
+      setAvailablePlaces(sortedPlaces);
+    });
+  }, []);
 
   function handleStartRemovePlace(id) {
     modal.current.open();
@@ -28,6 +43,11 @@ function App() {
       const place = AVAILABLE_PLACES.find((place) => place.id === id);
       return [place, ...prevPickedPlaces];
     });
+
+    const localSelectedPlaceIds =  JSON.parse(localStorage.getItem('selectedPlaces')) || [];
+    if (localSelectedPlaceIds.indexOf(id) === -1) {
+      localStorage.setItem('selectedPlaces', JSON.stringify([id, ...localSelectedPlaceIds]));
+    }
   }
 
   function handleRemovePlace() {
@@ -35,6 +55,9 @@ function App() {
       prevPickedPlaces.filter((place) => place.id !== selectedPlace.current)
     );
     modal.current.close();
+
+    const localSelectedPlaceIds =  JSON.parse(localStorage.getItem('selectedPlaces')) || [];
+    localStorage.setItem('selectedPlaces', JSON.stringify(localSelectedPlaceIds.filter((item) => item !== selectedPlace.current)));
   }
 
   return (
@@ -64,6 +87,7 @@ function App() {
         <Places
           title="Available Places"
           places={AVAILABLE_PLACES}
+          fallbackText="Sorting places by distance..."
           onSelectPlace={handleSelectPlace}
         />
       </main>
